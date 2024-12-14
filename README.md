@@ -127,7 +127,10 @@ for i, audio in enumerate(audios):
     torchaudio.save('test_english_{}.wav'.format(i), audios[0], 24000)    
 
 ```
-
+### Gradio Demo
+```bash
+python gradio_demo.py
+```
 
 ### Demo Inference
 - [ViiTor AI](https://www.viitor.io/text-to-speech)
