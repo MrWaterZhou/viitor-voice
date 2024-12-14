@@ -1,28 +1,34 @@
-## step1: Download dataset and preprocess models
-```commandline
-git lfs install
-
+## step1: Download dataset and base models
+```bash
 mkdir tool_models
 cd tool_models
-git clone https://huggingface.co/hubertsiuzdak/snac_24khz
-wget https://huggingface.co/model-scope/CosyVoice-300M/resolve/main/campplus.onnx
 git clone https://huggingface.co/Qwen/Qwen2-0.5B
 cd ..
 
+
 mkdir datasets
 cd datasets
-git clone https://huggingface.co/datasets/mythicinfinity/libritts_r
+mkdir emilia
+wget "https://huggingface.co/datasets/amphion/Emilia-Dataset/resolve/main/ZH/ZH-B000000.tar" -O emilia/ZH-B000000.tar
 cd ..
 ```
 
-## step2: Generate speaker token, speed token and snac tokens
-```
-python preprocess.py
+## step2: preprocess model
+```bash
+python viitor_voice/preprocess/preprocess_model.py tool_models/Qwen2-0.5B tool_models/Qwen2-0.5B-snac
 ```
 
-## step3: Prepare dataset, model, tokenizer
-```commandline
-python preprocess_raw_ids.py tool_models/Qwen2-0.5B datasets/libritts_r_tokenized.json datasets/libritts_r_tokenized.parquet tool_models/Qwen2-0.5B-snac
+## step3: preprocess dataset
+```bash
+# take emilia for example, if you are using other dataset, modify viitor_voice/preprocess/preprocess_model.py
+python viitor_voice/preprocess/preprocess_dataset.py datasets/emilia/ZH-B000000.tar
+
+python viitor_voice/preprocess/pack_datasets.py \
+    --tokenizer_path tool_models/Qwen2-0.5B-snac \
+    --data_type json \
+    --data_file "datasets/emilia/*.json" \
+    --max_length 2048 \
+    --save_path datasets/emilia.parquet
 ```
 
 ## step4: start training
@@ -31,7 +37,7 @@ deepspeed --include localhost:0,1 train.py     \
     --model_path tool_models/Qwen2-0.5B-snac \
     --model_type decoder     \
     --data_type parquet     \
-    --data_file "datasets/libritts_r_tokenized.parquet"     \
+    --data_file "datasets/emilia.parquet"     \
     --streaming false     \
     --max_length 2048 \
     --merge_inputs false     \
@@ -58,3 +64,4 @@ deepspeed --include localhost:0,1 train.py     \
     --warmup_steps 2000 \
     --lr_scheduler_kwargs '{"num_cycles": 5}'
 ```
+

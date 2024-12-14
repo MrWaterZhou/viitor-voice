@@ -2,14 +2,14 @@ from typing import Optional, List, Union, Tuple
 
 import torch
 from torch.nn import CrossEntropyLoss
-from transformers import BartForConditionalGeneration
-from transformers import Qwen2ForCausalLM
+from transformers import BartForConditionalGeneration as OldBartForConditionalGeneration
+from transformers import Qwen2ForCausalLM as OldQwen2ForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.modeling_outputs import Seq2SeqLMOutput
 from transformers.models.bart.modeling_bart import shift_tokens_right
 
 
-class Qwen2ForSnacLM(Qwen2ForCausalLM):
+class Qwen2ForCausalLM(OldQwen2ForCausalLM):
     num_new_vocab = 4368
 
     def forward(
@@ -103,7 +103,7 @@ class Qwen2ForSnacLM(Qwen2ForCausalLM):
         )
 
 
-class BartForSnacLM(BartForConditionalGeneration):
+class BartForConditionalGeneration(OldBartForConditionalGeneration):
     num_new_vocab = 4368
 
     def forward(

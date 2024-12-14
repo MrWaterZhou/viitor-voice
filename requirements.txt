@@ -1,6 +1,10 @@
 requests
+accelerate==1.1.1
+datasets==3.1.0
+numba
 transformers
-deepspeed
+tokenizers
+deepspeed==0.15.4
 vllm==0.6.3.post1
 snac
 torchaudio==2.4.0

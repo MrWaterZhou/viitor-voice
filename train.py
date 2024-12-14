@@ -10,7 +10,6 @@ from typing import Optional, List
 import datasets
 import torch
 import transformers
-from viitor_voice.custom import Qwen2ForSnacLM, BartForSnacLM
 from datasets import load_dataset
 from transformers import AutoConfig, AutoTokenizer, DataCollatorForSeq2Seq
 from transformers import \
@@ -20,7 +19,37 @@ from transformers import \
     Seq2SeqTrainingArguments, TrainerCallback, TrainingArguments, TrainerState, TrainerControl
 from transformers.trainer_utils import get_last_checkpoint, PREFIX_CHECKPOINT_DIR
 
+from viitor_voice.custom import Qwen2ForSnacLM, BartForSnacLM
+
 logger = logging.getLogger(__name__)
+
+
+class SaveTokenizer(TrainerCallback):
+    def on_save(
+            self,
+            args: TrainingArguments,
+            state: TrainerState,
+            control: TrainerControl,
+            **kwargs,
+    ):
+        checkpoint_folder = os.path.join(
+            args.output_dir, f"{PREFIX_CHECKPOINT_DIR}-{state.global_step}"
+        )
+        encoder_path = os.path.join(checkpoint_folder, 'encoder_tokenizer')
+        decoder_path = os.path.join(checkpoint_folder, 'decoder_tokenizer')
+
+        model = kwargs["model"]
+        encoder_config = AutoConfig.from_pretrained(model.encoder_path, trust_remote_code=True)
+        encoder_tokenizer = AutoTokenizer.from_pretrained(model.encoder_path, trust_remote_code=True)
+        encoder_config.save_pretrained(encoder_path)
+        encoder_tokenizer.save_pretrained(encoder_path)
+
+        decoder_config = AutoConfig.from_pretrained(model.decoder_path, trust_remote_code=True)
+        decoder_tokenizer = AutoTokenizer.from_pretrained(model.decoder_path, trust_remote_code=True)
+        decoder_config.save_pretrained(decoder_path)
+        decoder_tokenizer.save_pretrained(decoder_path)
+
+        return control
 
 
 @dataclass
@@ -28,8 +57,25 @@ class ModelArguments:
     """
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
-
+    encoder_path: str = field(
+        default=None,
+        metadata={
+            "help": "Path to pretrained model or model identifier from huggingface.co/models. Please note: tokenizer must have bos and eos"}
+    )
+    decoder_path: str = field(
+        default=None,
+        metadata={
+            "help": "Path to pretrained model or model identifier from huggingface.co/models. Please note: tokenizer must have bos and eos"}
+    )
     model_path: str = field(default=None, metadata={"help": "Source language id for translation."})
+    encoder_hidden_size: int = field(default=768, metadata={"help": "input dim for alignment layer"})
+    decoder_hidden_size: int = field(default=768, metadata={"help": "output dim for alignment layer"})
+    trainable_strategy: str = field(default=False,
+                                    metadata={"help": "encoder+layernorm/encoder/align"})
+
+    encoder_token_to_train: str = field(default=None, metadata={"help": "only finetune the embedding of these words"})
+    decoder_token_to_train: str = field(default=None, metadata={"help": "xx"})
+    do_align: bool = field(default=False, metadata={"help": "xx"})
     model_type: str = field(default=None, metadata={"help": "xx"})
     num_hidden_layers: int = field(default=None, metadata={"help": "xx"})
 
@@ -39,10 +85,14 @@ class DataTrainingArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
-    data_type: str = field(default='json', metadata={"help": "json, parquet, arrow..."})
+    data_type: str = field(default='json', metadata={"help": "json, parquet, arrow"})
     data_files: List[str] = field(default=None, metadata={"help": "the regrex of files"}, )
-
+    is_encoded: bool = field(default=False)
+    source_col_name: str = field(default='text', metadata={"help": ".."})
+    target_col_name: str = field(default='text', metadata={"help": ".."})
     streaming: bool = field(default=True)
+    merge_inputs: bool = field(default=True)
+
     preprocessing_num_workers: Optional[int] = field(
         default=None,
         metadata={"help": "The number of processes to use for the preprocessing."},
@@ -75,6 +125,9 @@ def build_model(model_args: ModelArguments):
                                                    torch_dtype=torch.bfloat16)
         encoder_tokenizer = AutoTokenizer.from_pretrained(model_args.model_path, trust_remote_code=True)
         decoder_tokenizer = AutoTokenizer.from_pretrained(model_args.model_path, trust_remote_code=True)
+        # for name, param in model.named_parameters():
+        #    if ("lm_head" not in name) and ('embed_tokens' not in name):
+        #        param.requires_grad = False
         return encoder_tokenizer, decoder_tokenizer, model
 
 
@@ -169,7 +222,7 @@ def main():
         tokenizer=None,
         data_collator=data_collator,
         compute_metrics=None,
-        callbacks=None
+        callbacks=None if model_args.model_type in {'seq2seq', 'decoder'} else [SaveTokenizer()]
     )
 
     # Training
@@ -183,6 +236,18 @@ def main():
         trainer.save_model()  # Saves the tokenizer too for easy upload
         if model_args.model_type in {'seq2seq', 'decoder'}:
             encoder_tokenizer.save_pretrained(training_args.output_dir)
+        else:
+            # save config and tokenizer
+            output_dir = training_args.output_dir
+            encoder_path = os.path.join(output_dir, 'encoder_tokenizer')
+            decoder_path = os.path.join(output_dir, 'decoder_tokenizer')
+            encoder_tokenizer.save_pretrained(encoder_path)
+            decoder_tokenizer.save_pretrained(decoder_path)
+            encoder_config = trainer.model.encoder.config
+            encoder_config.save_pretrained(encoder_path)
+            decoder_config = AutoConfig.from_pretrained(model.decoder_path)
+            decoder_config.save_pretrained(decoder_path)
+
         metrics = train_result.metrics
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
