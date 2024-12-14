@@ -7,9 +7,11 @@
 
 ## Update
 - **2024.12.14**:
+  - [demo](https://huggingface.co/spaces/ZzWater/viitor-voice)
   - Adjusted model input by removing speaker embeddings (we found that existing open-source speaker models struggle to capture speaker characteristics effectively and have limited generalization capabilities).
   - Supports zero-shot voice cloning.
   - Supports both Chinese and English languages.
+  
 ## Features
 
 - **Lightweight Design**  
