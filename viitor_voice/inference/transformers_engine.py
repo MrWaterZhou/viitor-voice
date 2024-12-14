@@ -40,7 +40,7 @@ class TransformersEngine:
                                              do_sample=False, repetition_penalty=1.3,
                                              suppress_tokens=list(range(151641)))
             output_ids = output_ids[0, prompt_ids.shape[-1]:].cpu().numpy().tolist()
-            generated_text = self.tokenizer.batch_decode([output_ids], skip_special_tokens=False)
+            generated_text = self.tokenizer.batch_decode([output_ids], skip_special_tokens=False)[0]
             snac_tokens = pattern.findall(generated_text)
             snac_tokens = [int(x) for x in snac_tokens]
             results.append(snac_tokens)
