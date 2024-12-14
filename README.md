@@ -60,6 +60,8 @@ https://github.com/user-attachments/assets/8a03785b-8100-48fe-8d64-fd98406aab1d
 ## Environment Setup
 
 ```commandline
+git clone https://github.com/viitor-ai/viitor-voice.git
+cd viitor-voice
 conda create -n viitor_voice python=3.10
 conda activate viitor_voice
 pip install -r requirements.txt
@@ -75,6 +77,7 @@ cp viitor_voice/utils/patch.py $python_package_path/vllm/entrypoints/openai/logi
 ### Pretrained Models
 - ~~[English](https://huggingface.co/ZzWater/viitor-voice-en)~~(deprecated)
 - ~~[Chinese](https://huggingface.co/ZzWater/viitor-voice-chs)~~(deprecated)
+- [Chinese & English](https://huggingface.co/ZzWater/viitor-voice-mix)
 ### Offline Inference
 
 **For GPU users**
