@@ -1,45 +1,42 @@
 import gradio as gr
-import torchaudio
-from io import BytesIO
-from viitor_voice.utils.offline_inference import OfflineInference
+import sys
+from viitor_voice.inference.vllm_engine import VllmEngine
 
-tts_engine = OfflineInference(
-    model_path='ZzWater/viitor-voice-en',
-    config_path='viitor_voice/inference_configs/en.json'
-)
-
-valid_speakers = list(tts_engine.prompt_map.keys())
+if __name__ == '__main__':
+    # Initialize your OfflineInference class with the appropriate paths
+    offline_inference = VllmEngine("ZzWater/viitor-voice-mix")
 
 
-def generate_audio(text, speaker, speed):
-    # check if speaker is valid
-    if speaker not in valid_speakers:
-        return f"Error: Invalid speaker. Please select one from {valid_speakers}."
+    def clone_batch(text_list, prompt_audio, prompt_text):
+        print(prompt_audio.name)
+        try:
+            audios = offline_inference.batch_infer(
+                text_list=[text_list],
+                prompt_audio_path=prompt_audio.name,  # Use uploaded file's path
+                prompt_text=prompt_text,
+            )
+            return 24000, audios[0].cpu().numpy()[0].astype('float32')
+        except Exception as e:
+            return str(e)
 
-    # Use OfflineInference to generate audio
-    audios = tts_engine.batch_infer(text_list=[text], speaker=[speaker], speed=int(speed))
 
-    return 24000, audios[0].numpy()[0]
+    with gr.Blocks() as demo:
+        gr.Markdown("# TTS Inference Interface")
+        with gr.Tab("Batch Clone"):
+            gr.Markdown("### Batch Clone TTS")
 
+            text_list_clone = gr.Textbox(label="Input Text List (Comma-Separated)",
+                                         placeholder="Enter text1, text2, text3...")
+            prompt_audio = gr.File(label="Upload Prompt Audio")
+            prompt_text = gr.Textbox(label="Prompt Text", placeholder="Enter the prompt text")
 
-with gr.Blocks() as demo:
-    gr.Markdown("## VIITOR VOICE: LLM based streaming tts")
+            clone_button = gr.Button("Run Batch Clone")
+            clone_output = gr.Audio(label="Generated Audios", type="numpy")
 
-    with gr.Row():
-        text_input = gr.Textbox(label="text", lines=5, placeholder="input text")
-        speaker_input = gr.Dropdown(label="speaker", choices=valid_speakers, value=valid_speakers[0])
-        speed_input = gr.Slider(label="speed", minimum=1, maximum=3, step=1, value=2)
+            clone_button.click(
+                fn=clone_batch,
+                inputs=[text_list_clone, prompt_audio, prompt_text],
+                outputs=clone_output
+            )
 
-    output_audio = gr.Audio(label="audio", type="numpy")
-
-    generate_button = gr.Button("generate")
-
-    generate_button.click(
-        fn=generate_audio,
-        inputs=[text_input, speaker_input, speed_input],
-        outputs=output_audio,
-    )
-
-# Launch the service on localhost:5005
-if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=5005)
+    demo.launch(server_name="0.0.0.0")
